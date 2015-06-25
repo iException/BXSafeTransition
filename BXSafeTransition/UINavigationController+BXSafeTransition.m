@@ -163,6 +163,9 @@
 
 - (void)bx_viewDidDisappear:(BOOL)animated
 {
+    // if pop canceled, return.
+    if ( self.bx_navigationController == nil ) { return; }
+
     self.bx_navigationController.bx_popingViewController = nil;
     
     [self.bx_navigationController bx_viewDidDisappear];
