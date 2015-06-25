@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name         = "BXSafeTransition"
-  s.version      = "0.0.1"
+  s.version      = "1.0.0"
   s.summary      = "It is a UINavigationController Category, which can avoid you jump into push and pop hole."
   s.description  = "It is a UINavigationController Category, which can avoid you jump into push and pop hole. Join us: shaozhengxingok@126.com"
   s.homepage     = "https://github.com/iException/BXSafeTransition"
