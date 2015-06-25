@@ -11,17 +11,15 @@
 
 @interface UINavigationController (BXSafeTransitionPrivate)
 
+@property (nonatomic, assign) BOOL bx_pushing;
+@property (nonatomic, assign) BOOL bx_poping;
+
 @property (nonatomic, strong) NSArray *bx_pushQueue;
-
 @property (nonatomic, strong) NSArray *bx_popQueue;
-
-@property (nonatomic, weak) UIViewController *bx_popingViewController;
 
 @end
 
 @interface UIViewController (BXSafeTransitionPrivate)
-
-@property (nonatomic, assign) BOOL bx_pushing;
 
 @property (nonatomic, weak) UINavigationController *bx_navigationController;
 
@@ -32,59 +30,72 @@
 + (void)load
 {
     // Method Swizzling `pushViewController:animated:`
-    Method pushOriginalMethod = class_getInstanceMethod(self, @selector(pushViewController:animated:));
-    Method pushSwizzledMethod = class_getInstanceMethod(self, @selector(bx_pushViewController:animated:));
-    method_exchangeImplementations(pushOriginalMethod, pushSwizzledMethod);
+    Method pushOriMethod = class_getInstanceMethod(self, @selector(pushViewController:animated:));
+    Method pushSwlMethod = class_getInstanceMethod(self, @selector(bx_pushViewController:animated:));
+    method_exchangeImplementations(pushOriMethod, pushSwlMethod);
     
     // Method Swizzling `popViewControllerAnimated:`
-    Method popOriginalMethod = class_getInstanceMethod(self, @selector(popViewControllerAnimated:));
-    Method popSwizzledMethod = class_getInstanceMethod(self, @selector(bx_popViewControllerAnimated:));
-    method_exchangeImplementations(popOriginalMethod, popSwizzledMethod);
+    Method popOriMethod = class_getInstanceMethod(self, @selector(popViewControllerAnimated:));
+    Method popSwlMethod = class_getInstanceMethod(self, @selector(bx_popViewControllerAnimated:));
+    method_exchangeImplementations(popOriMethod, popSwlMethod);
 }
 
 - (void)bx_pushViewController:(UIViewController *)viewController animated:(BOOL)animated
 {
-    if ( self.topViewController.bx_pushing ) {
+    // if pushing, add push operation into queue.
+    if ( self.bx_pushing ) {
         NSMutableArray *array = [self.bx_pushQueue mutableCopy];
         [array addObject:viewController];
         self.bx_pushQueue = [NSArray arrayWithArray:array];
         return;
     }
     
+    // remove current push operation when viewController in queue.
     if ( [self.bx_pushQueue containsObject:viewController] ) {
         NSMutableArray *array = [self.bx_pushQueue mutableCopy];
         [array removeObject:viewController];
         self.bx_pushQueue = [NSArray arrayWithArray:array];
     }
     
-    viewController.bx_pushing = YES;
+    // set pushing flag
+    self.bx_pushing = YES;
     
+    // do push operation
     [self bx_pushViewController:viewController animated:animated];
 }
 
 - (UIViewController *)bx_popViewControllerAnimated:(BOOL)animated
 {
-    if ( self.bx_popingViewController ) {
+    // if poping, add pop operation into queue.
+    if ( self.bx_poping ) {
         NSMutableArray *array = [self.bx_popQueue mutableCopy];
         [array addObject:[NSNull null]];
         self.bx_popQueue = [NSArray arrayWithArray:array];
         return nil;
     }
     
+    // remove current pop operation when viewController in queue.
     if ( self.bx_popQueue.count > 0 ) {
         NSMutableArray *array = [self.bx_popQueue mutableCopy];
         [array removeObjectAtIndex:0];
         self.bx_popQueue = [NSArray arrayWithArray:array];
     }
     
+    // set poping flag
+    self.bx_poping = YES;
+    
+    // do pop operation
     UIViewController *viewController = [self bx_popViewControllerAnimated:animated];
+    
+    // retain navigation controller when viewDidDisapplear, view.navigationController is nil.
     viewController.bx_navigationController = self;
-    self.bx_popingViewController = viewController;
+    
     return viewController;
 }
 
 - (void)bx_viewDidAppear
 {
+    // get first object in queue to do push operation.
     if ( self.bx_pushQueue.firstObject ) {
         [self pushViewController:self.bx_pushQueue.firstObject animated:YES];
     }
@@ -92,9 +103,31 @@
 
 - (void)bx_viewDidDisappear
 {
+    // get first object in queue to do pop operation.
     if ( self.bx_popQueue.firstObject ) {
         [self popViewControllerAnimated:YES];
     }
+}
+
+#pragma mark - setter & getter
+- (void)setBx_pushing:(BOOL)bx_pushing
+{
+    objc_setAssociatedObject(self, @selector(bx_pushing), @(bx_pushing), OBJC_ASSOCIATION_RETAIN);
+}
+
+- (BOOL)bx_pushing
+{
+    return [objc_getAssociatedObject(self, _cmd) boolValue];
+}
+
+- (void)setBx_poping:(BOOL)bx_poping
+{
+    objc_setAssociatedObject(self, @selector(bx_poping), @(bx_poping), OBJC_ASSOCIATION_RETAIN);
+}
+
+- (BOOL)bx_poping
+{
+    return [objc_getAssociatedObject(self, _cmd) boolValue];
 }
 
 - (void)setBx_pushQueue:(NSArray *)bx_pushQueue
@@ -127,16 +160,6 @@
     return queue;
 }
 
-- (void)setBx_popingViewController:(UIViewController *)bx_popingViewController
-{
-    objc_setAssociatedObject(self, @selector(bx_popingViewController), bx_popingViewController, OBJC_ASSOCIATION_RETAIN);
-}
-
-- (UIViewController *)bx_popingViewController
-{
-    return objc_getAssociatedObject(self, _cmd);
-}
-
 @end
 
 @implementation UIViewController (BXSafeTransition)
@@ -154,8 +177,13 @@
 
 - (void)bx_viewDidAppear:(BOOL)animated
 {
-    self.bx_pushing = NO;
+    // reset bx_pushing flag when push finished.
+    self.navigationController.bx_pushing = NO;
     
+    // reset bx_poping flag when pop canceled.
+    self.navigationController.bx_poping = NO;
+    
+    // goto next push operation
     [self.navigationController bx_viewDidAppear];
     
     [self bx_viewDidAppear:animated];
@@ -163,26 +191,16 @@
 
 - (void)bx_viewDidDisappear:(BOOL)animated
 {
-    // if pop canceled, return.
-    if ( self.bx_navigationController == nil ) { return; }
-
-    self.bx_navigationController.bx_popingViewController = nil;
+    // reset bx_poping flag when pop finished.
+    self.bx_navigationController.bx_poping = NO;
     
+    // goto next pop operation
     [self.bx_navigationController bx_viewDidDisappear];
     
     [self bx_viewDidDisappear:animated];
 }
 
-- (void)setBx_pushing:(BOOL)bx_pushing
-{
-    objc_setAssociatedObject(self, @selector(bx_pushing), @(bx_pushing), OBJC_ASSOCIATION_RETAIN);
-}
-
-- (BOOL)bx_pushing
-{
-    return [objc_getAssociatedObject(self, _cmd) boolValue];
-}
-
+#pragma mark - setter & getter
 - (void)setBx_navigationController:(UINavigationController *)bx_navigationController
 {
     objc_setAssociatedObject(self, @selector(bx_navigationController), bx_navigationController, OBJC_ASSOCIATION_RETAIN);
