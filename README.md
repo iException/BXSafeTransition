@@ -5,7 +5,7 @@ It is a UINavigationController Category, which can avoid you jump into push and 
 Use cocoapods  
 
 ``` 
-pod 'BXSafeTransition', '0.0.1'
+pod 'BXSafeTransition', '1.0.0'
 ```
 
 # License
