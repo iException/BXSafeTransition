@@ -8,5 +8,8 @@ Use cocoapods
 pod 'BXSafeTransition', '1.0.0'
 ```
 
+# Author
+phoebus [zhengxingok@gmail.com](https://github.com/shaozhengxing)
+
 # License
 MIT
