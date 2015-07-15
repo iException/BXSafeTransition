@@ -1,6 +1,0 @@
-framework module BXSafeTransition {
-  umbrella header "Pods-BXSafeTransition_Tests-BXSafeTransition-umbrella.h"
-
-  export *
-  module * { export * }
-}
