@@ -46,7 +46,7 @@
 - (void)bx_pushViewController:(UIViewController *)viewController animated:(BOOL)animated
 {
     // if pushing, add push operation into queue.
-    if ( self.bx_pushing ) {
+    if ( self.bx_pushing || self.bx_poping ) {
         NSMutableArray *array = [self.bx_pushQueue mutableCopy];
         [array addObject:viewController];
         self.bx_pushQueue = [NSArray arrayWithArray:array];
@@ -70,7 +70,7 @@
 - (UIViewController *)bx_popViewControllerAnimated:(BOOL)animated
 {
     // if poping, add pop operation into queue.
-    if ( self.bx_poping ) {
+    if ( self.bx_poping || self.bx_pushing ) {
         NSMutableArray *array = [self.bx_popQueue mutableCopy];
         [array addObject:[NSNull null]];
         self.bx_popQueue = [NSArray arrayWithArray:array];
